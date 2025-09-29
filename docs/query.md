@@ -133,6 +133,12 @@ Values: Range of Number
 
 Filter tracks by leaderboard value. Can provide either a minimum or maximum value, or both.
 
+### Examples
+
+`in:!hasrecord order1:uploadedAsc` Search for tracks with no replays uploaded and sort them from oldest to newest.
+
+`A01 tags:lol,!rpg length:...1m` Search for tracks with "A01" in their name, tagged with `lol` but not with `rpg`, with a length of up to 1 minute
+
 ## Trackpack queries
 
 Any non-parameter text will be used to search trackpacks by name.

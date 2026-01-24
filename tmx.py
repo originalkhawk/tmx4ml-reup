@@ -55,6 +55,7 @@ class Environment(StringableEnum):
     Coast = 4
     Bay = 5
     Stadium = 6
+    Highlands = 7
 
 
 class ReplayType(StringableEnum):
@@ -255,6 +256,8 @@ class Car(StringableEnum):
     Coast = 4
     Bay = 5
     Stadium = 6
+    Highlands = 7
+    NewSnow = 8
 
 
 SIMPLE_JSON_FIELDS = {

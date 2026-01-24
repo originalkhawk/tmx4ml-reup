@@ -23,6 +23,19 @@
     tmx.Environment.Coast: "$b71C$g",
     tmx.Environment.Bay: "$49fB$g",
     tmx.Environment.Stadium: "$1ccSt$g",
+    tmx.Environment.Highlands: "$8b5H$g",
+}%}
+
+{% set car_tags = {
+    tmx.Car.Snow: "$666Sn$g",
+    tmx.Car.Rally: "$4a1R$g",
+    tmx.Car.Desert: "$aa0D$g",
+    tmx.Car.Island: "$d22I$g",
+    tmx.Car.Coast: "$b71C$g",
+    tmx.Car.Bay: "$49fB$g",
+    tmx.Car.Stadium: "$1ccSt$g",
+    tmx.Car.Highlands: "$8b5H$g",
+    tmx.Car.NewSnow: "$666$iSn$g",
 }%}
 
 {% block body %}
@@ -61,11 +74,9 @@
             <label text="$o{{ environment_tags[track.Environment] }}" sizen="4 4" halign="center" textcolor="444f" textsize="3"
                 valign="bottom" posn="9.5 -13.5 5"/>
         {% else %}
-            {% set car_as_env = tmx.Environment(track.Car.value) %}
-            {% set enviro_tag = "{}$g{}".format(enviro_tag, environment_tags[car_as_env]) %}
             <label text="$o{{ environment_tags[track.Environment] }}" sizen="3 3" halign="center" textcolor="444f" textsize="2"
                 valign="bottom" posn="9 -12.5 5"/>
-            <label text="$o{{ environment_tags[car_as_env] }}" sizen="3 3" halign="center" textcolor="444f" textsize="2"
+            <label text="$o{{ car_tags[track.Car] }}" sizen="3 3" halign="center" textcolor="444f" textsize="2"
                 valign="bottom" posn="10 -13.5 4"/>
         {% endif %}
 

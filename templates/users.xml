@@ -2,7 +2,8 @@
 {% set origin = request.url.origin() %}
 
 {% set sidebar_buttons = {
-0: ("Icons64x64_1:NotBuddy", "Random User", "manialink:{}{}".format(origin, url("user-random")))
+0: ("Icons64x64_1:NotBuddy", "Random User", "manialink:{}{}".format(origin, url("user-random"))),
+1: ("Icons64x64_1:Buddy", logged_in_user.Name, "manialink:{}{}".format(origin, url("user-details", userid=logged_in_user.UserId))) if logged_in_user else None
 }
 %}
 

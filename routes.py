@@ -251,7 +251,30 @@ async def user_list(request: Request):
     async with session.get(url.with_query(params)) as res:
         results = await res.json(loads=json_loader)
 
-    return render_manialink("users.xml", request, {"users": results})
+    logged_in_user = request.app.get("logged_in_user_details")
+    logged_in_username = request.app.get("logged_in_username")
+    if logged_in_username and not logged_in_user:
+        try:
+            search_url = (request.app["api_url"] / "users").with_query({
+                "fields": "UserId,Name",
+                "name": logged_in_username,
+                "count": 10
+            })
+            async with session.get(search_url) as search_res:
+                if search_res.status == 200:
+                    search_results = await search_res.json(loads=json_loader)
+                    for u in search_results.get("Results", []):
+                        if u["Name"].lower() == logged_in_username.lower():
+                            logged_in_user = u
+                            break
+                    if not logged_in_user and search_results.get("Results"):
+                        logged_in_user = search_results["Results"][0]
+                    if logged_in_user:
+                        request.app["logged_in_user_details"] = logged_in_user
+        except Exception:
+            pass
+
+    return render_manialink("users.xml", request, {"users": results, "logged_in_user": logged_in_user})
 
 
 async def user_details(request: Request):

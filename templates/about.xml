@@ -16,5 +16,6 @@
     <label style="TextStaticSmall" text="TrackMania E$d00x$gchange for ManiaLinks" halign="center" posn="32 -8" />
 
     <label text="Source: $lhttps://github.com/mamg22/tmx4ml$l" posn="1 -16"/>
+    <label text="Source: $lhttps://github.com/originalkhawk/tmx4ml-reup$l" posn="1 -19"/>
 </frame>
 {% endblock body %}

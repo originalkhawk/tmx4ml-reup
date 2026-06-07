@@ -1,0 +1,152 @@
+{% extends "ui.xml" %}
+{% set origin = request.url.origin() %}
+
+{% set sidebar_buttons = {
+    0: ("Icons128x128_1:Replay", "Local Replays", "manialink:{}{}".format(origin, url("records-list"))),
+    8: ("Icons128x128_1:BackFocusable", "Back", "manialink:{}/{}/".format(origin, app["site"])),
+}
+%}
+
+{% set subtitle = "Autosaved Records" %}
+
+{% block body %}
+{% call(width, height) titled_box("Local Autosave Replays", BODY_LEFT + 1, 46, 96, 89) %}
+    <!-- Filter Toggle Buttons Bar -->
+    <quad style="Bgs1" substyle="BgPager" sizen="{{ width }} 5" posn="0 0 2" />
+
+    <!-- Button 1: Author -->
+    {% if filters.author.active %}
+        <quad bgcolor="0000" sizen="17 4" posn="1 -0.5 4" manialink="{{ filters.author.url }}" />
+        <quad style="MedalsBig" substyle="MedalNadeo" sizen="3 3.5" posn="2 -0.8 5" manialink="{{ filters.author.url }}" />
+        <label text="Author" posn="5.5 -1.3 5" textsize="2" textcolor="ffff" sizen="10 2" manialink="{{ filters.author.url }}" />
+    {% else %}
+        <quad bgcolor="0000" sizen="17 4" posn="1 -0.5 4" manialink="{{ filters.author.url }}" />
+        <label text="Author" posn="5.5 -1.3 5" textsize="2" textcolor="888f" sizen="10 2" manialink="{{ filters.author.url }}" />
+    {% endif %}
+
+    <!-- Button 2: Gold -->
+    {% if filters.gold.active %}
+        <quad bgcolor="0000" sizen="17 4" posn="20 -0.5 4" manialink="{{ filters.gold.url }}" />
+        <quad style="MedalsBig" substyle="MedalGold" sizen="3 3.5" posn="21 -0.8 5" manialink="{{ filters.gold.url }}" />
+        <label text="Gold" posn="24.5 -1.3 5" textsize="2" textcolor="ffff" sizen="10 2" manialink="{{ filters.gold.url }}" />
+    {% else %}
+        <quad bgcolor="0000" sizen="17 4" posn="20 -0.5 4" manialink="{{ filters.gold.url }}" />
+        <label text="Gold" posn="24.5 -1.3 5" textsize="2" textcolor="888f" sizen="10 2" manialink="{{ filters.gold.url }}" />
+    {% endif %}
+
+    <!-- Button 3: Silver -->
+    {% if filters.silver.active %}
+        <quad bgcolor="0000" sizen="17 4" posn="39 -0.5 4" manialink="{{ filters.silver.url }}" />
+        <quad style="MedalsBig" substyle="MedalSilver" sizen="3 3.5" posn="40 -0.8 5" manialink="{{ filters.silver.url }}" />
+        <label text="Silver" posn="43.5 -1.3 5" textsize="2" textcolor="ffff" sizen="10 2" manialink="{{ filters.silver.url }}" />
+    {% else %}
+        <quad bgcolor="0000" sizen="17 4" posn="39 -0.5 4" manialink="{{ filters.silver.url }}" />
+        <label text="Silver" posn="43.5 -1.3 5" textsize="2" textcolor="888f" sizen="10 2" manialink="{{ filters.silver.url }}" />
+    {% endif %}
+
+    <!-- Button 4: Bronze -->
+    {% if filters.bronze.active %}
+        <quad bgcolor="0000" sizen="17 4" posn="58 -0.5 4" manialink="{{ filters.bronze.url }}" />
+        <quad style="MedalsBig" substyle="MedalBronze" sizen="3 3.5" posn="59 -0.8 5" manialink="{{ filters.bronze.url }}" />
+        <label text="Bronze" posn="62.5 -1.3 5" textsize="2" textcolor="ffff" sizen="10 2" manialink="{{ filters.bronze.url }}" />
+    {% else %}
+        <quad bgcolor="0000" sizen="17 4" posn="58 -0.5 4" manialink="{{ filters.bronze.url }}" />
+        <label text="Bronze" posn="62.5 -1.3 5" textsize="2" textcolor="888f" sizen="10 2" manialink="{{ filters.bronze.url }}" />
+    {% endif %}
+
+    <!-- Button 5: None -->
+    {% if filters.none.active %}
+        <quad bgcolor="0000" sizen="17 4" posn="77 -0.5 4" manialink="{{ filters.none.url }}" />
+        <quad style="Icons128x128_1" substyle="Custom" sizen="2.5 2.5" posn="78.25 -1.25 5" manialink="{{ filters.none.url }}" />
+        <label text="None" posn="81.5 -1.3 5" textsize="2" textcolor="ffff" sizen="10 2" manialink="{{ filters.none.url }}" />
+    {% else %}
+        <quad bgcolor="0000" sizen="17 4" posn="77 -0.5 4" manialink="{{ filters.none.url }}" />
+        <label text="None" posn="81.5 -1.3 5" textsize="2" textcolor="888f" sizen="10 2" manialink="{{ filters.none.url }}" />
+    {% endif %}
+
+    <quad style="Bgs1" substyle="BgList" sizen="94 72" posn="-1 -5.5 2" />
+    {% if not records %}
+        <frame posn="0 -30 3">
+            <label text="(No matching records found)" halign="center" posn="47 0" textsize="3" textcolor="444f"/>
+        </frame>
+    {% endif %}
+    {% for record in records -%}
+    <frame posn="{{ loop.cycle(0, 46) }} {{ -6 - loop.index0 // 2 * 14 }} 3">
+        {% if record.track_name %}
+            <!-- Active Record Card (No links or thumbnails per user request) -->
+            <quad style="Bgs1" substyle="BgCardChallenge" sizen="46 14" posn="0 0 1" />
+            
+            <!-- Replay Name (First line, black text) -->
+            <label text="{{ record.name }}" posn="2 -1.5 2" sizen="31 2" textsize="2" textcolor="000f"/>
+            
+            <!-- TrackName (Second line, black text for readability) -->
+            <label text="Track: {{ record.track_name }}" posn="2 -4.5 2" sizen="31 2" textsize="2" textcolor="000f"/>
+            
+            <!-- Metadata - Size (Third line, left, classic track list text style) -->
+            <label text="Size: {{ record.size }}" posn="2 -7.5 2" sizen="26 2" textsize="2" textcolor="444f"/>
+            
+            <!-- Metadata - Modified Date (Fourth line, left) -->
+            <label text="Date: {{ record.modified }}" posn="2 -10.5 2" sizen="26 2" textsize="2" textcolor="444f"/>
+            
+            <!-- Replay Driving Time (positioned exactly where track length/time is on standard track list) -->
+            <label text="{{ record.time_str }}" posn="33 -7.5 2" sizen="7 2" halign="right" textsize="2" textcolor="000f"/>
+            
+            <!-- Medal Design on the Right -->
+            {% if record.medal != "None" %}
+                {% set style = record.medal if record.medal != "Author" else "Nadeo" %}
+                <quad style="MedalsBig" substyle="Medal{{ style }}" posn="40 -1.5 6" sizen="5 5.8" />
+                <label text="{{ record.medal }}" posn="42.5 -7.8 5" halign="center" sizen="8 1.5" textsize="1" textcolor="555f"/>
+            {% else %}
+                <quad style="Icons128x128_1" substyle="Custom" posn="41 -2.5 6" sizen="3 3" />
+                <label text="No Medal" posn="42.5 -6 5" halign="center" sizen="8 1.5" textsize="1" textcolor="777f"/>
+            {% endif %}
+
+            <!-- Interactive UPLOAD button below the medal -->
+            <quad style="Bgs1" substyle="NavButton" posn="38.5 -10 4" sizen="6 2.5" manialink="{{ origin }}{{ url('records-upload') }}?filename={{ record.filename_encoded }}" />
+            <label text="UPLOAD" posn="41.5 -10.6 5" halign="center" textsize="1" textcolor="ffff" sizen="5 2" manialink="{{ origin }}{{ url('records-upload') }}?filename={{ record.filename_encoded }}" />
+        {% else %}
+            <!-- Heavily Greyed Out Card (track not found, dark muted BgCardPlayer background) -->
+            <quad style="Bgs1" substyle="BgCardPlayer" sizen="46 14" posn="0 0 1" />
+            
+            <!-- Muted Replay Name -->
+            <label text="{{ record.name }}" posn="2 -1.5 2" sizen="31 2" textsize="2" textcolor="666f"/>
+            
+            <!-- Muted Status (Track not found) -->
+            <label text="Track not found on tmnf.exchange" posn="2 -4.5 2" sizen="35 2" textsize="2" textcolor="666f"/>
+            
+            <!-- Muted Metadata - Size -->
+            <label text="Size: {{ record.size }}" posn="2 -7.5 2" sizen="26 2" textsize="2" textcolor="555f"/>
+            
+            <!-- Muted Metadata - Modified Date -->
+            <label text="Date: {{ record.modified }}" posn="2 -10.5 2" sizen="26 2" textsize="2" textcolor="555f"/>
+            
+            <!-- Muted Replay Time -->
+            <label text="{{ record.time_str }}" posn="33 -7.5 2" sizen="7 2" halign="right" textsize="2" textcolor="555f"/>
+            
+            <!-- Muted Medal Placeholder -->
+            <quad style="Icons128x128_1" substyle="Custom" posn="41 -2.5 6" sizen="3 3" />
+            <label text="No Medal" posn="42.5 -6 5" halign="center" sizen="8 1.5" textsize="1" textcolor="555f"/>
+        {% endif %}
+    </frame>
+    {% endfor %}
+
+    {%- set first_attrs = {
+        'substyle': 'ArrowFirst' if page > 1 else 'StarGold',
+        'manialink': request.url.update_query(page=1) if page > 1
+    } -%}
+
+    {%- set prev_attrs = {
+        'substyle': 'ArrowPrev' if page > 1 else 'StarGold',
+        'manialink': request.url.update_query(page=page - 1) if page > 1
+    } -%}
+
+    {%- set next_attrs = {
+        'substyle': 'ArrowNext' if has_next else 'StarGold',
+        'manialink': request.url.update_query(page=page + 1) if has_next
+    } -%}
+
+    <quad posn="0 {{ -height + 4 }} 7" sizen="3 3" style="Icons64x64_1" {{ first_attrs | xmlattr }} />
+    <quad posn="{{ width / 2 - 5 }} {{ -height + 4 }} 7" sizen="3 3" halign="right" style="Icons64x64_1" {{ prev_attrs | xmlattr }} />
+    <quad posn="{{ width / 2 + 5 }} {{ -height + 4 }} 7" sizen="3 3" halign="right" style="Icons64x64_1" {{ next_attrs | xmlattr }} />
+{% endcall %}
+{% endblock body %}

@@ -1,8 +1,22 @@
-# `tmx4ml`: TrackMania Exchange for ManiaLinks
+# `tmx4ml+reup`: TrackMania Exchange for ManiaLinks + Replay Uploader
 
-Manialink frontend server for Trackmania Exchange Classic (TM1X). Allows browsing and playing tracks from TMX from the in-game manialink browser in TrackMania Nations/United Forever.
+## Disclaimer
+This project is **vibecoded with Gemini AI**. I (**Originalkhawk**) take absolute no responsibility for the code. It should be run entirely at your own risk.
 
-## Features
+## Credits & Special Thanks
+We would like to thank and credit **mamg22** for their incredible work on the original [`tmx4ml`](https://github.com/mamg22/tmx4ml) project, which served as the foundation and core engine for this fork.
+
+---
+
+## Features (added in `+reup`)
+
+* **Auto-Medal Parsing**: Extracts driving time and Track UIDs dynamically from local GBX header metadata, comparing them against official TrackMania Exchange (TMX) target times to automatically compute achieved medals (Author, Gold, Silver, Bronze, or None).
+* **Medal Filtering & Pagination**: Filter your local replays dynamically and browse through large records lists using intuitive paginated menus.
+* **Direct Replay Upload (Reup)**: Instantly upload local replays to the TrackMania Exchange backend database directly from the ManiaLink browser using a structured secure API multipart form upload flow.
+
+---
+
+## Original `tmx4ml` Features
 
 * Support for both [Nations exchange](https://tmnf.exchange/) and [United exchange](https://tmuf.exchange/).
 * UI design very close to the style used in-game, for a native look and feel.

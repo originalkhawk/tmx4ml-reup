@@ -6,6 +6,7 @@
     1: ("Icons128x128_1:Browse", "Trackpacks", "manialink:{}{}".format(origin, url("trackpack-list"))),
     2: ("Icons128x128_1:Buddies", "Users", "manialink:{}{}".format(origin, url("user-list"))),
     3: ("Icons128x128_1:Rankings", "Leaderboards", "manialink:{}{}".format(origin, url("leaderboards"))),
+    4: ("Icons128x128_1:Replay", "Replays", "manialink:{}{}".format(origin, url("records-list"))) if app["logged_in_username"] and app["site"] == "tmnf" else None,
     8: ("Icons128x128_1:BackFocusable", "Back", "manialink:" ~ origin),
 }
 %}

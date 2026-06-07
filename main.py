@@ -4,6 +4,11 @@ import argparse
 from datetime import datetime
 import logging
 from typing import Any
+import sys
+import urllib.parse
+import re
+import asyncio
+from html.parser import HTMLParser
 
 import aiohttp
 from aiohttp import web
@@ -16,14 +21,38 @@ import yarl
 
 import bbcode_tmx
 import routes as rt
+import records as rc
 import tmx
+from login import run_cli_loop, perform_exchange_login
 
 
 async def client_session_ctx(app: web.Application):
-    session = aiohttp.ClientSession()
+    connector = aiohttp.TCPConnector(
+        resolver=aiohttp.ThreadedResolver()
+    )
+
+    cookie_jar = aiohttp.CookieJar(unsafe=True)
+    cookies_data = app.get("cookies_data")
+    if cookies_data:
+        for k, v in cookies_data.items():
+            cookie_jar._cookies[k] = v
+
+    session = aiohttp.ClientSession(connector=connector, cookie_jar=cookie_jar)
+
     app["client_session"] = session
+    app["cookie_jar"] = cookie_jar
+
     for subapp in app._subapps:
         subapp["client_session"] = session
+        subapp["logged_in_username"] = app.get("logged_in_username")
+
+    # If login credentials are provided, run the OIDC login flow!
+    if app.get("login_credentials") and not any(c.key for c in session.cookie_jar if session.cookie_jar):
+        try:
+            await perform_exchange_login(session, app["login_credentials"])
+        except Exception as e:
+            print(f"⚠️ Login failed: {e}")
+            print("Starting server in unauthenticated mode.")
 
     yield
 
@@ -68,6 +97,10 @@ common_routes = [
     web.get("/user/{userid}", rt.user_details, name="user-details"),
     web.get("/user/random", rt.random_user, name="user-random"),
     web.get("/leaderboards/", rt.leaderboards, name="leaderboards"),
+    web.get("/records", rc.records_list, name="records-list"),
+    web.get("/records/play", rc.play_record, name="records-play"),
+    web.get("/records/download", rc.download_record, name="records-download"),
+    web.get("/records/upload", rc.upload_record, name="records-upload"),
 ]
 
 root_routes = [
@@ -150,8 +183,8 @@ def main():
     parser = argparse.ArgumentParser(
         description="ManiaLink frontend server for browsing TrackMania Exchange"
     )
-    parser.add_argument("-p", "--port", type=int, help="Port to bind to. Default: 8080")
-    parser.add_argument("-b", "--bind", help="Host to bind to. Default: 0.0.0.0")
+    parser.add_argument("-p", "--port", type=int, default=8080, help="Port to bind to. Default: 8080")
+    parser.add_argument("-b", "--bind", default="127.0.0.1", help="Host to bind to. Default: 127.0.0.1")
     parser.add_argument("-s", "--socket", help="Path to a Unix socket to listen on")
     parser.add_argument("-L", "--no-request-logging", dest="request_logging", action="store_false", help="Disable request logging")
 
@@ -161,7 +194,23 @@ def main():
 
     access_log = aiohttp.log.access_logger if args.request_logging else None
 
+    cookies_data = None
+    logged_in_username = None
+    start_mode = "start_unauth"
+
+    if sys.stdin.isatty():
+        try:
+            start_mode, cookies_data, logged_in_username = asyncio.run(run_cli_loop())
+        except (KeyboardInterrupt, SystemExit):
+            print("\nExiting...")
+            sys.exit(0)
+    else:
+        print("Non-interactive terminal detected. Starting server without logging in...")
+
     app = init_app()
+    app["cookies_data"] = cookies_data
+    app["logged_in_username"] = logged_in_username
+
     web.run_app(app, port=args.port, host=args.bind, path=args.socket, access_log=access_log)
 
 

@@ -11,7 +11,7 @@
 {%- endmacro -%}
 
 {%- macro branding(x, y, z=0) -%}
-<label style="TextStaticSmall" text="Powered by tm$d00x$g4ml" posn="{{ x }} {{ y }} {{ z }}" manialink="{{ origin / 'about' }}" />
+<label style="TextStaticSmall" text="Powered by tm$d00x$g4ml+reup" posn="{{ x }} {{ y }} {{ z }}" manialink="{{ origin / 'about' }}" />
 {%- endmacro -%}
 
 <manialink>

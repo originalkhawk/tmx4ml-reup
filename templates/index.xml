@@ -13,5 +13,6 @@
 
 {% block body %}
 <label style="TextRankingsBig" text="TrackMania E$d00x$gchange" halign="center" posn="0 46" />
+
 {{ branding(BODY_LEFT + 1, -44) }}
 {% endblock body %}

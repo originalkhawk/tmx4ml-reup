@@ -9,6 +9,7 @@
     4: ("Icons128x128_1:Forever", "Classic Tracks", "manialink:{}{}".format(origin, url("track-list").with_query(query="lbtype:classic"))),
     5: ("Icons128x128_1:CustomStars", "Star Tracks", "manialink:{}{}".format(origin, url("track-list").with_query(query="lbtype:star")))
         if app["site"] == "tmuf",
+	8: ("Icons128x128_1:BackFocusable", "Back", "manialink:{}{}".format(origin, url("home"))),
 }
 %}
 

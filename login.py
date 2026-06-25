@@ -6,6 +6,10 @@ from html.parser import HTMLParser
 import aiohttp
 import json
 import os
+import socket
+import uuid
+import hashlib
+import base64
 
 
 def load_config():
@@ -24,6 +28,59 @@ def save_config(config):
             json.dump(config, f, indent=4)
     except Exception as e:
         print(f"Error saving config: {e}")
+
+
+def get_system_key() -> str:
+    try:
+        hostname = socket.gethostname()
+        node = str(uuid.getnode())
+        return f"{hostname}-{node}"
+    except Exception:
+        return "fallback-tmx4ml-key"
+
+
+def _get_key_stream(key: bytes, length: int, salt: bytes) -> bytes:
+    stream = b""
+    counter = 0
+    while len(stream) < length:
+        h = hashlib.sha256(key + salt + str(counter).encode()).digest()
+        stream += h
+        counter += 1
+    return stream[:length]
+
+
+def encrypt_password(password: str, key_str: str) -> str:
+    password_bytes = password.encode('utf-8')
+    salt = os.urandom(16)
+    key_bytes = key_str.encode('utf-8')
+    keystream = _get_key_stream(key_bytes, len(password_bytes), salt)
+    ciphertext = bytes(p ^ k for p, k in zip(password_bytes, keystream))
+    combined = salt + ciphertext
+    return base64.b64encode(combined).decode('utf-8')
+
+
+def decrypt_password(encrypted_str: str, key_str: str) -> str:
+    try:
+        combined = base64.b64decode(encrypted_str.encode('utf-8'))
+        if len(combined) < 16:
+            return ""
+        salt = combined[:16]
+        ciphertext = combined[16:]
+        key_bytes = key_str.encode('utf-8')
+        keystream = _get_key_stream(key_bytes, len(ciphertext), salt)
+        password_bytes = bytes(c ^ k for c, k in zip(ciphertext, keystream))
+        return password_bytes.decode('utf-8')
+    except Exception:
+        return ""
+
+
+def get_secret_key():
+    config = load_config()
+    if "secret_key" not in config:
+        config["secret_key"] = uuid.uuid4().hex
+        save_config(config)
+    return config["secret_key"]
+
 
 
 class LoginFormParser(HTMLParser):
@@ -95,23 +152,45 @@ class LoginFormParser(HTMLParser):
         return {name: inp["value"] for name, inp in form["inputs"].items()}
 
 
-def extract_username_from_usershow(html: str) -> str | None:
-    # 1. Match "<div class="dropdown-header">Hi, <b>...</b>!"
+def extract_account_username(html: str) -> str | None:
+    # Match the login/account page header content
     m = re.search(r'Hi,\s*<b>([^<]+)</b>!', html, re.IGNORECASE)
     if m:
         return m.group(1).strip()
-    
-    # 2. Match "<title>User Profile: ... | TMNF-X</title>"
-    m = re.search(r'<title>User Profile:\s*([^|]+?)\s*\|\s*TMNF-X</title>', html, re.IGNORECASE)
+
+    m = re.search(r'<h3>\s*Hello\s+([^<]+)!', html, re.IGNORECASE)
     if m:
         return m.group(1).strip()
-        
-    # 3. Match "<h3 style="display:inline;"><i class="fas fa-user" title=""></i>&nbsp;..."
-    m = re.search(r'<i class="fas fa-user"[^>]*></i>\s*&nbsp;\s*([^<\s]+)', html, re.IGNORECASE)
-    if m:
-        return m.group(1).strip()
-        
+
     return None
+
+
+async def verify_account_links(session: aiohttp.ClientSession) -> dict[str, bool | str | None]:
+    account_url = "https://account.mania.exchange/account"
+    try:
+        async with session.get(account_url, allow_redirects=True) as resp:
+            html = await resp.text()
+            final_url = str(resp.url)
+            status = resp.status
+
+        if status != 200:
+            return {"tmnf": False, "tmuf": False, "username": None}
+
+        if any(part in final_url.lower() for part in ("login", "signin", "challenge")):
+            return {"tmnf": False, "tmuf": False, "username": None}
+
+        html_lower = html.lower()
+        has_tmnf = "tmnf-x" in html_lower and "trackmania nations forever exchange" in html_lower
+        has_tmuf = "tmuf-x" in html_lower and "trackmania united forever exchange" in html_lower
+
+        username = extract_account_username(html)
+        return {
+            "tmnf": has_tmnf,
+            "tmuf": has_tmuf,
+            "username": username,
+        }
+    except Exception:
+        return {"tmnf": False, "tmuf": False, "username": None}
 
 
 async def perform_exchange_login(session: aiohttp.ClientSession, credentials: dict[str, str]):
@@ -130,15 +209,12 @@ async def perform_exchange_login(session: aiohttp.ClientSession, credentials: di
     ]
     for trigger in triggers:
         try:
-            # Use allow_redirects=True to follow login redirects, establishing
-            # state cookies on tmnf.exchange before hitting account.mania.exchange
             async with session.get(trigger, allow_redirects=True) as resp:
                 final_url = str(resp.url)
                 if "account.mania.exchange" in final_url:
                     login_url = final_url
                     break
                 else:
-                    # Failover: check headers in intermediate redirect history
                     for h in resp.history:
                         loc = h.headers.get("Location")
                         if loc and "account.mania.exchange" in loc:
@@ -183,7 +259,6 @@ async def perform_exchange_login(session: aiohttp.ClientSession, credentials: di
     async with session.post(post_url, data=post_data, allow_redirects=True) as resp:
         redirected_html = await resp.text()
         current_url = str(resp.url)
-        current_status = resp.status
 
     max_redirects = 15
     redirects_followed = 0
@@ -197,38 +272,16 @@ async def perform_exchange_login(session: aiohttp.ClientSession, credentials: di
             callback_url = urllib.parse.urljoin(current_url, parser_callback.action)
             async with session.post(callback_url, data=parser_callback.inputs, allow_redirects=True) as tmnf_resp:
                 await tmnf_resp.text()
-                
-                cookies = [c.key for c in session.cookie_jar]
-                if any("Antiforgery" in c or "Session" in c or "Identity" in c or "Cookie" in c for c in cookies) or len(cookies) > 0:
-                    # Verification Step: Attempt to load the user's profile verified session
-                    try:
-                        async with session.get("https://tmnf.exchange/usershow", allow_redirects=True) as verify_resp:
-                            verify_html = await verify_resp.text()
-                            verify_url = str(verify_resp.url)
-                            
-                            is_logged_in = False
-                            # A successful login response from usershow must return HTTP 200
-                            if verify_resp.status == 200:
-                                # If we get redirected to a login page, we are not logged in
-                                if "login" not in verify_url.lower() and "signin" not in verify_url.lower() and "challenge" not in verify_url.lower():
-                                    login_indicators = ("log out", "logout", "sign out", "signout", "hi, <b>")
-                                    username_clean = credentials["username"].split("@")[0].lower()
-                                    if any(ind in verify_html.lower() for ind in login_indicators) or username_clean in verify_html.lower():
-                                        is_logged_in = True
-                            
-                            if is_logged_in:
-                                extracted_name = extract_username_from_usershow(verify_html)
-                                if extracted_name:
-                                    return extracted_name
-                                return credentials["username"].split("@")[0]
-                            else:
-                                raise ValueError("Session verification failed. Profile page suggests login did not succeed.")
-                    except Exception as e:
-                        raise ValueError(f"Session verification check failed: {e}")
-                else:
-                    return
+
+            account_status = await verify_account_links(session)
+            if account_status.get("username") or account_status.get("tmnf") or account_status.get("tmuf"):
+                return {
+                    "tmnf": account_status.get("tmnf", False),
+                    "tmuf": account_status.get("tmuf", False),
+                    "username": account_status.get("username") or credentials["username"],
+                }
+            raise ValueError("Session verification failed for both TMNF and TMUF.")
         elif parser_callback.action:
-            # Check if this form has any password input. If so, it's the login form itself (failed login or returned)
             selected_form = parser_callback.get_login_form()
             has_password = False
             if selected_form:
@@ -236,19 +289,17 @@ async def perform_exchange_login(session: aiohttp.ClientSession, credentials: di
                     if inp["type"] == "password" or "password" in name.lower():
                         has_password = True
                         break
-            
+
             if has_password:
                 break
 
             intermediate_url = urllib.parse.urljoin(current_url, parser_callback.action)
             redirects_followed += 1
-            
+
             async with session.post(intermediate_url, data=parser_callback.inputs, allow_redirects=True) as resp:
                 redirected_html = await resp.text()
                 current_url = str(resp.url)
-                current_status = resp.status
         else:
-            # No form to follow
             break
 
     if "Invalid login attempt" in redirected_html or "invalid" in redirected_html.lower() or email_key in parser_callback.inputs:
@@ -260,95 +311,180 @@ async def perform_exchange_login(session: aiohttp.ClientSession, credentials: di
 async def run_cli_loop():
     cookie_jar = aiohttp.CookieJar(unsafe=True)
     while True:
+        config = load_config()
+        saved_username = config.get("saved_username") or config.get("logged_in_username")
+        has_saved = bool(saved_username)
+
         print("\n=============================================")
         print("           TrackMania Exchange tmx4ml")
         print("=============================================")
         print("Please select an option:")
-        print("  1) Log in to tmnf.exchange")
-        print("  2) Start the server without logging in")
-        print("  3) Exit")
+        if has_saved:
+            print(f"  1) Start the server with saved session ({saved_username})")
+            print("  2) Log in with a different account")
+            print("  3) Start the server without logging in")
+            print("  4) Exit")
+        else:
+            print("  1) Log in to tmnf.exchange")
+            print("  2) Start the server without logging in")
+            print("  3) Exit")
         print("---------------------------------------------")
         try:
-            choice = input("Option [1-3]: ").strip().lower()
+            prompt_range = "[1-4]" if has_saved else "[1-3]"
+            choice = input(f"Option {prompt_range}: ").strip().lower()
         except EOFError:
-            print("\nNon-interactive or EOF detected. Starting server without logging in...")
-            return "start_unauth", None, None
+            print("\nNon-interactive or EOF detected. Starting server...")
+            return "start_unauth", None, None, {"tmnf": False, "tmuf": False}
 
-        if choice == "1":
-            try:
-                username = input("Username/Email: ").strip()
-                import getpass
-                password = getpass.getpass("Password (hidden): ")
-            except EOFError:
-                print("\nError: EOF reading input. Returning to main menu.")
+        # Normalize choices based on whether saved option is active
+        if has_saved:
+            if choice == "1":
+                # Load the saved session from config
+                from main import deserialize_cookies
+                saved_cookies = deserialize_cookies(config.get("cookies_data"))
+                saved_site_access = config.get("site_access", {"tmnf": False, "tmuf": False})
+                return "start_auth", saved_cookies, saved_username, saved_site_access
+            elif choice == "2":
+                # Go to login flow
+                pass
+            elif choice == "3":
+                print("Starting server without logging in...")
+                return "start_unauth", None, None, {"tmnf": False, "tmuf": False}
+            elif choice == "4":
+                print("Exiting...")
+                sys.exit(0)
+            else:
+                print("Invalid option. Please select 1, 2, 3, or 4.")
+                continue
+        else:
+            if choice == "1":
+                # Go to login flow
+                pass
+            elif choice == "2":
+                print("Starting server without logging in...")
+                return "start_unauth", None, None, {"tmnf": False, "tmuf": False}
+            elif choice == "3":
+                print("Exiting...")
+                sys.exit(0)
+            else:
+                print("Invalid option. Please select 1, 2, or 3.")
                 continue
 
-            connector = aiohttp.TCPConnector(resolver=aiohttp.ThreadedResolver())
-            async with aiohttp.ClientSession(connector=connector, cookie_jar=cookie_jar) as session:
-                try:
-                    extracted_username = await perform_exchange_login(session, {"username": username, "password": password})
-                    if not extracted_username:
-                        extracted_username = username.split("@")[0]
-                    logged_in = True
-                except Exception as e:
-                    print(f"\n⚠️ Login failed: {e}")
-                    continue
+        # If we reached here, we are doing a new login
+        try:
+            username = input("Username/Email: ").strip()
+            import getpass
+            password = getpass.getpass("Password (hidden): ")
+        except EOFError:
+            print("\nError: EOF reading input. Returning to main menu.")
+            continue
 
-            if logged_in:
-                print("\n=============================================")
-                print(f"Welcome {extracted_username}!")
-                print("=============================================")
-                
-                # Authenticated menu helper loop
-                while True:
-                    config = load_config()
-                    has_autosave = bool(config.get("autosave_location"))
-                    print("Please select an option:")
-                    print("  1) Start the server")
-                    print("  2) Log out")
-                    print("  3) Exit")
-                    if not has_autosave:
-                        print("  4) Set Autosave Location")
-                    print("---------------------------------------------")
-                    try:
-                        prompt = "Option [1-4]: " if not has_autosave else "Option [1-3]: "
-                        auth_choice = input(prompt).strip().lower()
-                    except EOFError:
-                        print("\nNon-interactive or EOF detected. Shuts down.")
-                        sys.exit(0)
+        connector = aiohttp.TCPConnector(resolver=aiohttp.ThreadedResolver())
+        async with aiohttp.ClientSession(connector=connector, cookie_jar=cookie_jar) as session:
+            try:
+                login_results = await perform_exchange_login(session, {"username": username, "password": password})
 
-                    if auth_choice == "1":
-                        return "start_auth", cookie_jar._cookies, extracted_username
-                    elif auth_choice == "2":
-                        cookie_jar.clear()
-                        print("\nLogged out successfully.")
-                        break # breaks auth loop, goes back to main menu
-                    elif auth_choice == "3":
-                        print("Exiting...")
-                        sys.exit(0)
-                    elif auth_choice == "4" and not has_autosave:
-                        try:
-                            path_input = input("Enter TrackMania autosave folder path: ").strip()
-                            if path_input:
-                                config["autosave_location"] = path_input
-                                save_config(config)
-                                print("Autosave location saved successfully!")
-                            else:
-                                print("Autosave location cannot be empty.")
-                        except EOFError:
-                            print("\nError: EOF reading input.")
-                        continue
+                tmnf_ok = bool(login_results.get("tmnf", False))
+                tmuf_ok = bool(login_results.get("tmuf", False))
+                account_name = login_results.get("username") or username.split("@")[0]
+
+                if tmnf_ok or tmuf_ok:
+                    if tmnf_ok and tmuf_ok:
+                        print(f"✔️ {account_name} (TMNF) | ✔️ {account_name} (TMUF)")
+                        site_access = {"tmnf": True, "tmuf": True}
+                    elif tmnf_ok:
+                        print(f"✔️ {account_name} (TMNF) | ❌ TMUF - please link your account on TMUF.Exchange")
+                        site_access = {"tmnf": True, "tmuf": False}
                     else:
-                        if not has_autosave:
-                            print("Invalid option. Please choose 1, 2, 3, or 4.")
-                        else:
-                            print("Invalid option. Please choose 1, 2, or 3.")
+                        print(f"❌ TMNF - please link your account on TMNF.Exchange | ✔️ {account_name} (TMUF)")
+                        site_access = {"tmnf": False, "tmuf": True}
+                    display_username = account_name
+                    return_username = account_name
+                    logged_in = True
+                else:
+                    print("❌ TMNF | ❌ TMUF | FAILED TO LOG IN ⚠️")
+                    cookie_jar.clear()
+                    continue
+            except Exception as e:
+                print(f"\n⚠️ Login failed: {e}")
+                cookie_jar.clear()
+                continue
 
-        elif choice == "2":
-            print("Starting server without logging in...")
-            return "start_unauth", None, None
-        elif choice == "3":
-            print("Exiting...")
-            sys.exit(0)
-        else:
-            print("Invalid option. Please choose 1, 2, or 3.")
+        if logged_in:
+            print("\n=============================================")
+            print(f"Welcome {display_username}!")
+            print("=============================================")
+
+            # Optional choice to save credentials
+            try:
+                save_creds = input("Would you like to save your encrypted credentials to auto-renew your session? [y/N]: ").strip().lower()
+                if save_creds in ("y", "yes"):
+                    secret_key = get_secret_key()
+                    system_key = get_system_key()
+                    final_key = system_key + secret_key
+                    encrypted_pw = encrypt_password(password, final_key)
+                    
+                    config = load_config()
+                    config["saved_username"] = username
+                    config["saved_password_encrypted"] = encrypted_pw
+                    save_config(config)
+                    print("Credentials encrypted and saved successfully.")
+                else:
+                    config = load_config()
+                    config.pop("saved_username", None)
+                    config.pop("saved_password_encrypted", None)
+                    save_config(config)
+            except EOFError:
+                pass
+
+            # Authenticated menu helper loop
+            while True:
+                config = load_config()
+                has_autosave = bool(config.get("autosave_location"))
+                print("Please select an option:")
+                print("  1) Start the server")
+                print("  2) Log out")
+                print("  3) Exit")
+                if not has_autosave:
+                    print("  4) Set Autosave Location")
+                print("---------------------------------------------")
+                try:
+                    prompt = "Option [1-4]: " if not has_autosave else "Option [1-3]: "
+                    auth_choice = input(prompt).strip().lower()
+                except EOFError:
+                    print("\nNon-interactive or EOF detected. Shuts down.")
+                    sys.exit(0)
+
+                if auth_choice == "1":
+                    return "start_auth", cookie_jar._cookies, return_username, site_access
+                elif auth_choice == "2":
+                    cookie_jar.clear()
+                    config = load_config()
+                    config.pop("cookies_data", None)
+                    config.pop("logged_in_username", None)
+                    config.pop("site_access", None)
+                    config.pop("saved_username", None)
+                    config.pop("saved_password_encrypted", None)
+                    save_config(config)
+                    print("\nLogged out successfully.")
+                    break # breaks auth loop, goes back to main menu
+                elif auth_choice == "3":
+                    print("Exiting...")
+                    sys.exit(0)
+                elif auth_choice == "4" and not has_autosave:
+                    try:
+                        path_input = input("Enter TrackMania autosave folder path: ").strip()
+                        if path_input:
+                            config["autosave_location"] = path_input
+                            save_config(config)
+                            print("Autosave location saved successfully!")
+                        else:
+                            print("Autosave location cannot be empty.")
+                    except EOFError:
+                        print("\nError: EOF reading input.")
+                    continue
+                else:
+                    if not has_autosave:
+                        print("Invalid option. Please choose 1, 2, 3, or 4.")
+                    else:
+                        print("Invalid option. Please choose 1, 2, or 3.")

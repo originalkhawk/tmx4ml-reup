@@ -25,7 +25,7 @@
     <quad sizen="29 7" posn="-63.5 47.5 2" style="Bgs1" substyle="BgTitlePage"/>
 
     {# Title and subtitle #}
-    <label style="TextRankingsBig" text="$i{{ app['site'] | default('TM') | upper }}-$d00X" posn="-62.5 46.5 3" textcolor="ffff"/>
+    <label style="TextRankingsBig" text="$i{{ app['site'] | default('TM', true) | upper }}-$d00X" posn="-62.5 46.5 3" textcolor="ffff"/>
     <label style="TextSubTitle1" text="{{ subtitle }}" posn="-62 43 3" textcolor="ffff"/>
 
     {# Sidebar buttons #}

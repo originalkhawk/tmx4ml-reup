@@ -14,8 +14,8 @@ from routes import render_manialink, json_loader
 
 
 async def records_list(request: Request):
-    if request.app.get("site") != "tmnf":
-        msg = mc.render_maniacode([mc.ShowMessage("Local autosave replays are only supported on TrackMania Nations Forever (TMNF).")])
+    if request.app.get("site") not in ("tmnf", "tmuf"):
+        msg = mc.render_maniacode([mc.ShowMessage("Local autosave replays are only supported on TMNF/TMUF pages.")])
         return web.Response(text=msg, content_type="application/xml")
 
     logged_in_username = request.app.get("logged_in_username")
@@ -199,6 +199,9 @@ async def records_list(request: Request):
     any_active = show_author or show_gold or show_silver or show_bronze or show_none
     filtered_records = []
     for r in records:
+        if not r.get("track_name") or not r.get("track_id"):
+            continue
+
         medal = r.get("medal", "None")
         if any_active:
             if medal == "Author" and not show_author:
@@ -227,7 +230,7 @@ async def records_list(request: Request):
     page_records = filtered_records[start_idx:end_idx]
     has_next = len(filtered_records) > end_idx
 
-    return render_manialink("records.xml", request, {
+    return render_manialink("record.xml", request, {
         "records": page_records,
         "page": page,
         "has_next": has_next,
@@ -274,7 +277,7 @@ async def download_record(request: Request):
     autosave_location = config.get("autosave_location")
 
     if not autosave_location:
-         raise web.HTTPBadRequest(reason="Autosave location is not configured")
+        raise web.HTTPBadRequest(reason="Autosave location is not configured")
 
     safe_filename = os.path.basename(filename)
     file_path = os.path.join(autosave_location, safe_filename)
@@ -381,3 +384,35 @@ async def upload_record(request: Request):
 
     msg = mc.render_maniacode([mc.ShowMessage(msg_text)])
     return web.Response(text=msg, content_type="application/xml")
+
+
+async def record_details(request: Request):
+    trackid = request.match_info["trackid"]
+    session = request.app["client_session"]
+
+    async with asyncio.TaskGroup() as tg:
+        track_query = {
+            "id": trackid,
+            "count": 1,
+            "fields": "TrackId,TrackName,AuthorTime,AuthorScore,GoldTarget,SilverTarget,BronzeTarget,Authors,Difficulty,Routes,Mood,Tags,"
+            "Awards,Comments,ReplayType,TrackValue,PrimaryType,Car,Environment,UploadedAt,UpdatedAt,UnlimiterVersion,AuthorComments",
+        }
+        track_url = (request.app["api_url"] / "tracks").with_query(track_query)
+        track_task = tg.create_task(session.get(track_url))
+
+        replay_query = {
+            "trackId": trackid,
+            "best": 1,
+            "fields": "ReplayId,User.Name,User.UserId,ReplayTime,ReplayScore,ReplayRespawns,Position",
+        }
+        replay_url = (request.app["api_url"] / "replays").with_query(replay_query)
+        replay_task = tg.create_task(session.get(replay_url))
+
+    track = await track_task.result().json(loads=json_loader)
+    replays = await replay_task.result().json(loads=json_loader)
+
+    return render_manialink(
+        "records.xml",
+        request,
+        {"track": track["Results"][0], "replays": replays},
+    )

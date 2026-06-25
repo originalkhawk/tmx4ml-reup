@@ -347,3 +347,4 @@ def make_simple_handler(template: str) -> Handler:
         return render_manialink(template, request, {})
 
     return handler
+

@@ -13,7 +13,8 @@
     query='order1:commentsdesc author:' ~ quoted_name))),
 5: ("Icons64x64_1:Outbox", "Comments Given", "manialink:{}{}".format(origin, url("track-list").with_query(
     query='order1:usercommenteddesc commentedby:' ~ quoted_name))),
-8: ("Icons64x64_1:Windowed", "Open in browser", "url:{}/usershow/{}".format(app["base_url"], user.UserId)),
+7: ("Icons64x64_1:Windowed", "Open in browser", "url:{}/usershow/{}".format(app["base_url"], user.UserId)),
+8: ("Icons128x128_1:BackFocusable", "Back", "manialink:{}{}".format(origin, url("home"))),
 } %}
 
 {% set subtitle = "User details" %}

@@ -17,7 +17,7 @@ We would like to thank and credit **mamg22** for their incredible work on the or
 ---
 
 <details>
-<summary>Show original README</summary>
+<summary>#Show original README</summary>
 
 
 # `tmx4ml`: TrackMania Exchange for ManiaLinks

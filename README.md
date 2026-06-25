@@ -8,7 +8,7 @@ We would like to thank and credit **mamg22** for their incredible work on the or
 
 ---
 
-## Features (added in `+reup`)
+## Features added in `reup`
 
 * **Auto-Medal Parsing**: Extracts driving time and Track UIDs dynamically from local GBX header metadata, comparing them against official TrackMania Exchange (TMX) target times to automatically compute achieved medals (Author, Gold, Silver, Bronze, or None).
 * **Medal Filtering & Pagination**: Filter your local replays dynamically and browse through large records lists using intuitive paginated menus.
@@ -16,7 +16,15 @@ We would like to thank and credit **mamg22** for their incredible work on the or
 
 ---
 
-## Original `tmx4ml` Features
+<details>
+<summary>Show original README</summary>
+
+
+# `tmx4ml`: TrackMania Exchange for ManiaLinks
+
+Manialink frontend server for Trackmania Exchange Classic (TM1X). Allows browsing and playing tracks from TMX from the in-game manialink browser in TrackMania Nations/United Forever.
+
+## Features
 
 * Support for both [Nations exchange](https://tmnf.exchange/) and [United exchange](https://tmuf.exchange/).
 * UI design very close to the style used in-game, for a native look and feel.
@@ -85,3 +93,6 @@ To pass arguments to the app, you can run:
 ```bash
 docker compose run --rm app --help
 ```
+
+</details>
+---
